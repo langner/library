@@ -1,1 +1,6 @@
 library.bib
+library.log
+.email
+*/*.bib
+*/*.pdf
+*/*.ps
