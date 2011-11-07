@@ -78,7 +78,7 @@ def getdoi(emailfile=".email", journal=False, volume=False, issue=False, spage=F
 def find_localfile(entry):
     """
     Searches for a local file in all subdirectories, returning and setting the first one found.
-    Use "<year> - <title>" format and Levenshtein distances in fuzzy search.
+    Looks for entry key, or "<year> - <title>" format and Levenshtein distances in fuzzy search.
     """
 
     if not entry.has_key('date'):
@@ -97,7 +97,14 @@ def find_localfile(entry):
         fnames = [fn for fn in os.listdir(path) if os.path.splitext(fn)[1] in formats]
         if len(fnames) == 0:
             continue;
-        
+
+        keypdf = entry.key.key+".pdf"
+        if keypdf in fnames:
+            fname = fnames[fnames.index(keypdf)]
+            path +=  "/%s" %fname
+            entry['localfile'] = path
+            return path
+
         ratios = [Levenshtein.ratio(os.path.splitext(fn)[0].lower(),full.lower()) for fn in fnames]
         contain = [os.path.splitext(fn)[0].lower() in full.lower() for fn in fnames]
 
