@@ -4,3 +4,4 @@ library.log
 */*.bib
 */*.pdf
 */*.ps
+*.pyc
