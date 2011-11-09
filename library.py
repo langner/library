@@ -202,17 +202,18 @@ if __name__ == "pybliographer":
 
         splitfile = sys.argv[3]
         if len(sys.argv) > 4:
-            keywords = sys.argv[4:]
+            subjects = sys.argv[4:]
         else:
-            keywords = [splitfile.split('/')[0]]
+            subjects = [splitfile.split('/')[0]]
 
         db = bibopen(bibfile)
         newdb = Base.DataBase(db.key)
 
         for key,entry in db.dict.iteritems():
-            if any([kw in entry['keywords'].text.split(', ') for kw in keywords]):
+            if any([s in entry['subjects'].text.split(', ') for s in subjects]):
                 if entry.has_key('localfile') and entry['localfile'].text.strip():
                     entry['localfile'] = entry['localfile'].text.split('/')[1]
+                    entry.__delitem__("subjects")
                 newdb[key] = entry
 
         writebib(newdb, splitfile)
