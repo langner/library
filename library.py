@@ -13,6 +13,10 @@ import Levenshtein
 
 from Pyblio.Format import BibTeX
 
+license = """
+This BibTeX file is made available under the Public Domain Dedication and License v1.0 whose full text can be found in the accompanying README file or online at http://www.opendatacommons.org/licenses/pddl/1.0/
+"""
+
 
 # ##################
 # Global definitions
@@ -128,6 +132,7 @@ def writebib(db, fname):
         - sort alphanumericcally by keys
         - single empty lines between entries
         - all fields are on single lines
+        - license at top of file as a comment
         - no comments
     """
 
@@ -140,7 +145,9 @@ def writebib(db, fname):
     text.seek(0)
 
     # Now do the actualy printing, with tweaks.
+    # At the beginning, print out the license.
     f = open(fname,'w')
+    print >>f, license
     multiline = {}
     for line in text:
 
