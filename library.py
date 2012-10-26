@@ -19,7 +19,6 @@ import StringIO
 
 import os
 import sys
-import time
 import urllib
 
 import xml.dom.minidom
@@ -27,6 +26,17 @@ import xml.dom.minidom
 import Levenshtein
 
 from Pyblio.Format import BibTeX
+
+
+listdir = os.listdir
+
+abspath = os.path.abspath
+dirname = os.path.dirname
+exists = os.path.exists
+splitext = os.path.splitext
+
+argv = sys.argv
+
 
 license = """
 This BibTeX file is made available under the Public Domain Dedication and License v1.0 whose full text can be found in the accompanying README file or online at http://www.opendatacommons.org/licenses/pddl/1.0/
@@ -38,7 +48,7 @@ This BibTeX file is made available under the Public Domain Dedication and Licens
 # ##################
 
 # The bibliography file is assumed to be in the same directory as this script.
-bibfile = os.path.abspath(os.path.join(os.path.dirname(sys.argv[1])))+"/library.bib"
+bibfile = abspath(os.path.join(dirname(argv[1]))) + "/library.bib"
 
 # These are the permissible extensions for local files.
 formats = ('.pdf', '.ps')
@@ -63,18 +73,21 @@ def std_id(entry, n=0):
     years in the standard format.
     """
 
-    auth = entry['author'][0].last.split()[-1]
+    first_author = entry['author'][0].last.split()[-1]
     if len(entry['author']) == 2:
-        auth += "-%s" %entry['author'][1].last.split()[-1]
+        others = entry['author'][1].last.split()[-1]
     if len(entry['author']) > 2:
-        auth += "-%s" %"".join([a.last.split()[-1][0] for a in entry['author'][1:]])
-    if entry.has_key('date'):
-        key = "%s-%s" %(entry['date'].year,auth)
+        others = [a.last.split()[-1][0] for a in entry['author'][1:]]
+        others = "".join(others)
+    if "date" in entry.keys():
+        year = entry['date'].year
+        key = "%s-%s-%s" % (year, first_author, others)
         if n > 0:
-            key += "-%i" %n
+            key += "-%i" % n
         return Base.Entry(key, entry.key.base)
     else:
         return None
+
 
 def getdoi(emailfile=".email", journal=False, volume=False, issue=False, spage=False, date=False):
     """ Fetch DOIs automatically from crossref for a large number of articles.
@@ -84,19 +97,20 @@ def getdoi(emailfile=".email", journal=False, volume=False, issue=False, spage=F
     I used this in the past, now I mostly import entries or retrieve DOIs manually.
     """
 
-    journal = journal.replace(" ", "%20")
-    url = "http://www.crossref.org/openurl?pid=%s" %open(emailfile).read().strip()
+    email = open(emailfile).read().strip()
+    url = "http://www.crossref.org/openurl?pid=%s" % email
 
     if journal:
-        url += "&title=%s" %journal
+        journal = journal.replace(" ", "%20")
+        url += "&title=%s" % journal
     if volume:
-        url += "&volume=%s" %volume
+        url += "&volume=%s" % volume
     if issue:
-        url += "&issue=%s" %issue
+        url += "&issue=%s" % issue
     if spage:
-        url += "&spage=%s" %spage
+        url += "&spage=%s" % spage
     if date:
-        url += "&date=%s" %date
+        url += "&date=%s" % date
     url += "&redirect=false&format=unixref"
 
     txt = urllib.urlopen(url).read()
@@ -105,6 +119,7 @@ def getdoi(emailfile=".email", journal=False, volume=False, issue=False, spage=F
     dois = [doi.childNodes[0].nodeValue for doi in dois]
 
     return dois
+
 
 def find_localfile(entry):
     """ Search for a local file corresponding to a given key
@@ -116,21 +131,21 @@ def find_localfile(entry):
     always take precedence over the entry key.
     """
 
-    if not entry.has_key('date'):
+    if not 'date' in entry.keys():
         return None
 
-    expected_filename = "%s - %s" %(entry['date'].year, entry['title'])
-    expected_filename = expected_filename.replace('{','').replace('}','')
+    expected_filename = "%s - %s" % (entry['date'].year, entry['title'])
+    expected_filename = expected_filename.replace('{', '').replace('}', '')
 
-    for subdir in os.listdir('.'):
+    for subdir in listdir('.'):
 
         if not os.path.isdir(subdir):
-            continue;
+            continue
 
-        fnames = [fn for fn in os.listdir(subdir) if os.path.splitext(fn)[1] in formats]
-        fnames_noext = [os.path.splitext(fn)[0] for fn in fnames]
+        fnames = [fn for fn in listdir(subdir) if splitext(fn)[1] in formats]
+        fnames_noext = [splitext(fn)[0] for fn in fnames]
         if len(fnames) == 0:
-            continue;
+            continue
 
         if entry.key.key in fnames_noext:
             localfname = fnames[fnames_noext.index(entry.key.key)]
@@ -140,16 +155,18 @@ def find_localfile(entry):
         if max(ratios) > 0.8:
             localfname = fnames[ratios.index(max(ratios))]
 
-        contain = [fn.lower() in expected_filename.lower() for fn in fnames_noext]
-        if contain.count(True) != 0:
-            localfname = fnames[contain.index(True)]
+        get_contains = lambda s1, s2: s1.lower() in s2.lower()
+        contains = [get_contains(fn, expected_filename) for fn in fnames_noext]
+        if contains.count(True) != 0:
+            localfname = fnames[contains.index(True)]
 
         if 'localfname' in locals():
-            path =  "%s/%s" %(subdir, localfname)
+            path = "%s/%s" % (subdir, localfname)
             entry['localfile'] = path
             return path
 
     return None
+
 
 def writebib(db, fname):
     """ Write a database to file.
@@ -172,41 +189,42 @@ def writebib(db, fname):
 
     # Now do the actualy printing, with tweaks.
     # At the beginning, print the license to the file.
-    f = open(fname,'w')
-    print >>f, license
+    f = open(fname, 'w')
+    print >> f, license
 
     multiline = {}
     for line in text:
 
         if not line.strip() or line[0:8] == "@comment":
-            continue;
+            continue
 
-        # Append the line to multiline until a brace is met, then print everything.
+        # Append the line to multiline until a brace is met,
+        # then print everything.
         if multiline:
             multiline[key] += " " + line.strip()
-            if line.strip()[-2] in ('"','}'):
+            if line.strip()[-2] in ('"', '}'):
                 for key in multiline:
-                    print >>f, "\t%s = %s" %(key, multiline[key])
+                    print >> f, "\t%s = %s" % (key, multiline[key])
                 multiline = {}
-            continue;
+            continue
 
         # Format and print line, initiate an element in multiline when needed.
         if len(line.split()) > 1 and line.split()[1] == "=":
             key = line.split()[0]
             value = " ".join(line.split()[2:])
             if len(value.split()) > 1:
-                if value[0] in ('"','{') and not value.strip()[-2] in ('"','}'):
+                if value[0] in ('"', '{') and not value.strip()[-2] in ('"', '}'):
                     multiline[key] = value.strip()
-                    continue;
-            print >>f, "\t%s = %s" %(key,value)
-            continue;
+                    continue
+            print >> f, "\t%s = %s" % (key, value)
+            continue
 
         # Print line with entry header or closing braces (only ones left).
-        print >>f, line.strip()
+        print >> f, line.strip()
 
         # Add an extra empty line after closing braces.
         if line.strip() == "}":
-            print >>f, ""
+            print >> f, ""
 
     f.close()
 
@@ -215,20 +233,20 @@ if __name__ == "pybliographer":
 
     # When reformatting the library file, abort if there is any entry without
     # the collection field -- all entries should have this field.
-    # Also, try to find a local file and set the localfile field if one can be found.
-    if "fix" in sys.argv:
+    # Also try to find a local file and set the localfile field if possible.
+    if "fix" in argv:
 
         db = bibopen(bibfile)
         newdb = Base.DataBase(db.key)
-        for key,entry in db.dict.iteritems():
+        for key, entry in db.dict.iteritems():
 
-            if not entry.has_key("collection"):
-                raise KeyError, "Missing collection field in: %s" %key.key
+            if not "collection" in entry.keys():
+                raise KeyError("Missing collection field in: %s" % key.key)
 
-            if not entry.has_key('localfile') or not os.path.exists(str(entry['localfile'])):
+            if not 'localfile' in entry.keys() or not exists(str(entry['localfile'])):
                 entry['localfile'] = ""
                 if find_localfile(entry):
-                    print "  %s: set localfile" %(key.key)
+                    print "  %s: set localfile" % (key.key)
 
             newdb[key] = entry
 
@@ -238,20 +256,20 @@ if __name__ == "pybliographer":
     # This code actually extracts a subset of the database based on one collection
     # value, so run this script many times to divide the entire database among
     # all possible values of collections (via Makefile, for example).
-    if "split" in sys.argv:
+    if "split" in argv:
 
-        splitfile = sys.argv[3]
-        if len(sys.argv) > 4:
-            collection = sys.argv[4:]
+        splitfile = argv[3]
+        if len(argv) > 4:
+            collection = argv[4:]
         else:
             collection = [splitfile.split('/')[0]]
 
         db = bibopen(bibfile)
         newdb = Base.DataBase(db.key)
 
-        for key,entry in db.dict.iteritems():
+        for key, entry in db.dict.iteritems():
             if any([s in entry['collection'].text.split(', ') for s in collection]):
-                if entry.has_key('localfile') and entry['localfile'].text.strip():
+                if 'localfile' in entry.keys() and entry['localfile'].text.strip():
                     entry['localfile'] = entry['localfile'].text.split('/')[1]
                     entry.__delitem__("collection")
                 newdb[key] = entry
