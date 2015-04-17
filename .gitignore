@@ -1,6 +1,5 @@
 library.log
 .email
-*/*.bib
 */*.pdf
 */*.ps
 *.pyc
